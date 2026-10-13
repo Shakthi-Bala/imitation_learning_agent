@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+import time
 from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
@@ -20,7 +22,7 @@ from hw1_imitation.data import (
     load_pusht_zarr,
 )
 from hw1_imitation.model import build_policy, PolicyType
-from hw1_imitation.evaluation import Logger
+from hw1_imitation.evaluation import Logger, evaluate_policy
 
 LOGDIR_PREFIX = "exp"
 
@@ -127,7 +129,73 @@ def run_training(config: TrainConfig) -> None:
     )
     logger = Logger(log_dir)
 
-    ### TODO: PUT YOUR MAIN TRAINING LOOP HERE ###
+    optimizer = torch.optim.Adam(
+        model.parameters(), lr=config.lr, weight_decay=config.weight_decay
+    )
+    # Compiling the loss also compiles its backward pass (via AOTAutograd).
+    compute_loss = torch.compile(model.compute_loss)
+
+    def run_eval(step: int) -> None:
+        evaluate_policy(
+            model,
+            normalizer,
+            device,
+            chunk_size=config.chunk_size,
+            video_size=config.video_size,
+            num_video_episodes=config.num_video_episodes,
+            flow_num_steps=config.flow_num_steps,
+            step=step,
+            logger=logger,
+        )
+        model.train()  # evaluate_policy switches the model to eval mode
+
+    total_steps = config.num_epochs * len(loader)
+    print(f"Training for {config.num_epochs} epochs = {total_steps} steps")
+
+    step = 0
+    loss_sum = 0.0
+    last_log_time = time.perf_counter()
+    model.train()
+    for epoch in range(config.num_epochs):
+        for state, action_chunk in loader:
+            state = state.to(device, non_blocking=True)
+            action_chunk = action_chunk.to(device, non_blocking=True)
+
+            loss = compute_loss(state, action_chunk)
+            optimizer.zero_grad(set_to_none=True)
+            loss.backward()
+            optimizer.step()
+
+            step += 1
+            loss_sum += loss.item()
+
+            if step % config.log_interval == 0:
+                now = time.perf_counter()
+                logger.log(
+                    {
+                        "train/loss": loss_sum / config.log_interval,
+                        "train/epoch": epoch,
+                        "train/steps_per_sec": config.log_interval
+                        / (now - last_log_time),
+                    },
+                    step=step,
+                )
+                loss_sum = 0.0
+                last_log_time = now
+
+            if step % config.eval_interval == 0:
+                run_eval(step)
+                last_log_time = time.perf_counter()
+
+    if step % config.eval_interval != 0:
+        run_eval(step)  # always evaluate the final policy
+
+    # Logger's log.csv only keeps the columns of its first row, so also save
+    # every scalar metric (train and eval) for plotting the report curves.
+    with (log_dir / "metrics.jsonl").open("w") as f:
+        for row in logger.rows:
+            scalars = {k: v for k, v in row.items() if isinstance(v, (int, float))}
+            f.write(json.dumps(scalars) + "\n")
 
     logger.dump_for_grading()
 

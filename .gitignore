@@ -1,0 +1,7 @@
+# Personal credentials and secrets -- never commit
+wandb.txt
+*.key
+.env
+.env.*
+.netrc
+secrets/

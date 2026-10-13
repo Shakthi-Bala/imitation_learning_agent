@@ -37,7 +37,6 @@ class BasePolicy(nn.Module, metaclass=abc.ABCMeta):
 class MSEPolicy(BasePolicy):
     """Predicts action chunks with an MSE loss."""
 
-    ### TODO: IMPLEMENT MSEPolicy HERE ###
     def __init__(
         self,
         state_dim: int,
@@ -46,13 +45,27 @@ class MSEPolicy(BasePolicy):
         hidden_dims: tuple[int, ...] = (128, 128),
     ) -> None:
         super().__init__(state_dim, action_dim, chunk_size)
+        # MLP: state -> [Linear -> ReLU] x len(hidden_dims) -> Linear -> flat chunk.
+        layers: list[nn.Module] = []
+        in_dim = state_dim
+        for hidden_dim in hidden_dims:
+            layers += [nn.Linear(in_dim, hidden_dim), nn.ReLU()]
+            in_dim = hidden_dim
+        layers.append(nn.Linear(in_dim, chunk_size * action_dim))
+        self.net = nn.Sequential(*layers)
+
+    def forward(self, state: torch.Tensor) -> torch.Tensor:
+        # (batch, state_dim) -> (batch, chunk_size, action_dim)
+        return self.net(state).view(-1, self.chunk_size, self.action_dim)
 
     def compute_loss(
         self,
         state: torch.Tensor,
         action_chunk: torch.Tensor,
     ) -> torch.Tensor:
-        raise NotImplementedError
+        # Eq. (1): squared L2 norm over the whole chunk, averaged over the batch.
+        pred_chunk = self(state)
+        return (pred_chunk - action_chunk).pow(2).sum(dim=(1, 2)).mean()
 
     def sample_actions(
         self,
@@ -60,7 +73,8 @@ class MSEPolicy(BasePolicy):
         *,
         num_steps: int = 10,
     ) -> torch.Tensor:
-        raise NotImplementedError
+        # Deterministic policy: a single forward pass, num_steps is unused.
+        return self(state)
 
 
 class FlowMatchingPolicy(BasePolicy):
