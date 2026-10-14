@@ -3,9 +3,6 @@
 from __future__ import annotations
 
 import json
-import os
-import socket
-import tempfile
 from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
@@ -75,17 +72,10 @@ def train(config: TrainConfig) -> list[dict]:
     )
 
     optimizer = torch.optim.Adam(model.parameters(), lr=config.lr)
-    # Compiled CPU kernels are ISA-specific; a cache shared across heterogeneous cluster nodes
-    # can load kernels built for another CPU and corrupt the heap, so keep one cache per host.
-    os.environ.setdefault(
-        "TORCHINDUCTOR_CACHE_DIR",
-        str(Path(tempfile.gettempdir()) / f"torchinductor_{socket.gethostname()}"),
-    )
-    compute_loss = torch.compile(model.compute_loss)
 
     metrics, running_loss = [], 0.0
     for step, (state, chunk) in enumerate(_forever(loader), start=1):
-        loss = compute_loss(state, chunk)
+        loss = model.compute_loss(state, chunk)
         optimizer.zero_grad(set_to_none=True)
         loss.backward()
         optimizer.step()
