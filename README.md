@@ -1,21 +1,25 @@
-# Imitation Learning on Push-T
+# Imitation Learning on Push-T: from 2D to a UR5e Arm
 
-Teaching a robot to push a T-shaped block into a goal zone by imitating 206 human demonstrations.
+Teaching a robot to push a T-shaped block into a goal zone by imitating 206 human demonstrations, first in the 2D Push-T benchmark and then with a simulated UR5e arm.
 
 <p align="center">
-  <img src="pusht_action_chunking/report/flow_vs_mse.gif" width="420" alt="Same starting position: the MSE policy gets stuck beside the T, the flow matching policy brings it back to the goal">
+  <img src="ur_pusht/media/pusht2d_flow_seed7.gif" width="800" alt="A UR5e arm with a stick pushes the T block into the green goal; right panel shows the same scene from above">
 </p>
+<p align="center"><sub>A policy trained only on 2D data, running zero-shot on a UR5e in MuJoCo. Right: top view with the arm hidden; the red dot is the policy's current target.</sub></p>
 
-The policy sees a 5-number state (agent position, block position and angle) and predicts the next **8 actions at once** instead of one at a time. This is called action chunking, and it is the idea behind modern robot-learning methods such as [Diffusion Policy](https://diffusion-policy.cs.columbia.edu/).
+The policy sees a 5-number state (pusher position, block position and angle) and predicts the next **8 actions at once** instead of one at a time. This is called action chunking, and it is the idea behind modern robot-learning methods such as [Diffusion Policy](https://diffusion-policy.cs.columbia.edu/).
+
+| Part | What | Folder |
+|---|---|---|
+| 1 | MSE and flow matching policies on 2D Push-T (UC Berkeley [CS 185/285](https://rail.eecs.berkeley.edu/deeprlcourse/) Homework 1, Spring 2026) | [`pusht_action_chunking/`](pusht_action_chunking/) |
+| 2 | The same task with a UR5e arm in MuJoCo: zero-shot transfer and self-improvement | [`ur_pusht/`](ur_pusht/) |
+
+## Part 1: 2D Push-T
 
 I trained two policies with the same network and training budget:
 
 - **MSE:** predicts the 8 actions directly in one pass.
 - **Flow matching:** starts from random noise and refines it into an action chunk over 10 small steps, like a simpler form of diffusion.
-
-This is Homework 1 of UC Berkeley's [CS 185/285 Deep Reinforcement Learning](https://rail.eecs.berkeley.edu/deeprlcourse/) (Spring 2026).
-
-## Results
 
 | | MSE | Flow matching |
 |---|---|---|
@@ -27,15 +31,19 @@ This is Homework 1 of UC Berkeley's [CS 185/285 Deep Reinforcement Learning](htt
 Reward is the average over 100 test episodes of how much of the goal the block covers (1.0 = perfect).
 
 <p align="center">
-  <img src="pusht_action_chunking/report/mse_training_curves.png" width="49%" alt="MSE training loss and evaluation reward">
-  <img src="pusht_action_chunking/report/flow_training_curves.png" width="49%" alt="Flow matching training loss and evaluation reward">
+  <img src="pusht_action_chunking/report/flow_vs_mse.gif" width="420" alt="Same starting position: the MSE policy gets stuck beside the T, the flow matching policy brings it back to the goal">
 </p>
 
 MSE levels off around 0.63. When the demonstrations show two different ways to push the block, MSE predicts their average, which is often neither. In the GIF above it parks beside the T and never moves again. Flow matching samples one of the options instead, so it keeps trying and recovers. The cost is that it sometimes hesitates between strategies and rarely holds perfectly still at the goal.
 
+<p align="center">
+  <img src="pusht_action_chunking/report/mse_training_curves.png" width="49%" alt="MSE training loss and evaluation reward">
+  <img src="pusht_action_chunking/report/flow_training_curves.png" width="49%" alt="Flow matching training loss and evaluation reward">
+</p>
+
 Reports: [MSE (PDF)](pusht_action_chunking/report/mse_report.pdf) · [Flow matching (PDF)](pusht_action_chunking/report/flow_report.pdf) · [rollout videos](pusht_action_chunking/report/videos/)
 
-## How it works
+**How it works**
 
 - **Model:** an MLP with 3 hidden layers of 256 units and ReLU, about 140k parameters, for both policies.
 - **MSE loss:** squared error between the predicted chunk and the human's chunk.
@@ -44,6 +52,31 @@ Reports: [MSE (PDF)](pusht_action_chunking/report/mse_report.pdf) · [Flow match
 - **Evaluation:** every 10k steps the policy plays 100 episodes in the simulator, running each 8-action chunk open-loop before re-planning.
 
 My code is in [`model.py`](pusht_action_chunking/src/hw1_imitation/model.py) (`MSEPolicy`, `FlowMatchingPolicy`), [`train.py`](pusht_action_chunking/src/hw1_imitation/train.py) (training loop) and [`plot_curves.py`](pusht_action_chunking/plot_curves.py). The data loading, environment and evaluation code is the course's starter code.
+
+## Push-T on a UR5e arm
+
+The same task with a UR5e holding a stick, in MuJoCo. The T now drags on the table with real friction (μ = 0.35), which the 2D benchmark does not have. Everything else matches the 2D task (1 px = 1 mm, same start states, same success test), so the 2D policies run on the arm unchanged.
+
+**The arm follows the policy closely.** Damped least-squares inverse kinematics, gravity compensation and a velocity feed-forward term keep the stick tip within 0.3 mm on average of where the policy sends it.
+
+**The 2D flow policy transfers zero-shot.**
+
+| Policy (trained in 2D) | 2D Push-T | UR5e, mean reward | UR5e, solved |
+|---|---|---|---|
+| MSE | 0.629 | 0.524 | 7 % |
+| Flow matching | 0.817 | **0.79–0.82** | **12–20 %** |
+
+The range is four evaluations of the same policy; tiny numerical differences between CPU types change contact-rich rollouts, so differences of about ±0.02 reward are noise.
+
+**Retraining on the robot's own successes did not help.** Each round ran the policy on 2000 new start states, kept the solved episodes, and trained on them. I tried three variants against a control trained on the human demos alone:
+
+<p align="center">
+  <img src="ur_pusht/media/self_improvement.png" width="800" alt="Success rate and mean reward per self-improvement round for three variants, with the human-only control as a gray band">
+</p>
+
+Retraining from scratch (A, B) lost 0.04–0.12 reward against the control, because the kept episodes come from start states the policy already solves, so each round's data gets narrower. Fine-tuning the previous policy (C) held roughly level. Keeping or dropping whole episodes tells the model nothing about which pushes mattered; using the reward inside training (RL fine-tuning of the flow policy) is the natural next step.
+
+Report: [UR5e Push-T (PDF)](ur_pusht/report/ur_pusht_report.pdf) · videos: [solved](ur_pusht/media/pusht2d_flow_seed36.mp4), [failed](ur_pusht/media/pusht2d_flow_seed12.mp4) · code and setup: [`ur_pusht/`](ur_pusht/)
 
 ## Reproduce it
 
@@ -70,7 +103,11 @@ uv run --with matplotlib plot_curves.py exp/<run_name> --title "Flow matching po
 
 All defaults (seed 42) match the results above. Flow matching samples random noise, so its exact reward varies slightly from run to run. Run `uv run src/hw1_imitation/train.py --help` to see every option.
 
+For the UR5e part, see [`ur_pusht/README.md`](ur_pusht/README.md).
+
 ## Status
 
 - [x] MSE action-chunking policy
 - [x] Flow matching policy
+- [x] UR5e Push-T in MuJoCo: zero-shot transfer and self-improvement
+- [ ] RL fine-tuning of the flow policy on the arm
