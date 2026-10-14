@@ -1,8 +1,9 @@
 """Self-improvement: alternate between collecting successful episodes and retraining on them.
 
 Round 0 is the 2D Push-T policy running zero-shot on the arm. Each later round collects
-episodes with the previous policy on fresh seeds, keeps the successes, and trains a new policy
-from scratch on every success gathered so far, plus any fixed base datasets.
+episodes with the previous policy on fresh seeds, keeps the successes, and trains on every
+success gathered so far plus any fixed base datasets: either a new policy from scratch, or
+(with --finetune) the previous policy, keeping its normalizer.
 """
 
 from __future__ import annotations
@@ -27,6 +28,8 @@ class ImproveConfig:
     rounds: int = 3
     episodes_per_round: int = 2000
     policy_type: PolicyType = "flow"
+    finetune: bool = False
+    lr: float = 3e-4
     train_steps: int = 60_000
     eval_every: int = 20_000
     eval_episodes: int = 100
@@ -58,6 +61,8 @@ def improve(config: ImproveConfig) -> list[dict]:
             TrainConfig(
                 datasets=tuple(datasets),
                 out=round_dir,
+                init_policy=policy if config.finetune else None,
+                lr=config.lr,
                 policy_type=config.policy_type,
                 steps=config.train_steps,
                 eval_every=config.eval_every,

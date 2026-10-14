@@ -23,6 +23,7 @@ from ur_pusht.rollout import run_episodes, summarize
 class TrainConfig:
     datasets: tuple[Path, ...]
     out: Path
+    init_policy: Path | None = None
     policy_type: PolicyType = "flow"
     chunk_size: int = 8
     hidden_dims: tuple[int, ...] = (256, 256, 256)
@@ -49,21 +50,27 @@ def train(config: TrainConfig) -> list[dict]:
     config.out.mkdir(parents=True, exist_ok=True)
 
     states, actions, episode_ends = load_datasets(list(config.datasets))
-    normalizer = Normalizer.from_data(states, actions)
+    if config.init_policy is not None:
+        policy = Policy.load(config.init_policy)
+        policy.model.train()
+    else:
+        model = build_policy(
+            config.policy_type,
+            state_dim=states.shape[1],
+            action_dim=actions.shape[1],
+            chunk_size=config.chunk_size,
+            hidden_dims=config.hidden_dims,
+        )
+        normalizer = Normalizer.from_data(states, actions)
+        policy = Policy(model, normalizer, config.policy_type, config.hidden_dims)
+    model, normalizer = policy.model, policy.normalizer
+
     dataset = PushtChunkDataset(states, actions, episode_ends, config.chunk_size, normalizer)
     loader = DataLoader(dataset, batch_size=config.batch_size, shuffle=True, drop_last=True)
     print(
         f"{len(episode_ends)} episodes, {len(dataset)} chunks from {len(config.datasets)} datasets"
     )
 
-    model = build_policy(
-        config.policy_type,
-        state_dim=states.shape[1],
-        action_dim=actions.shape[1],
-        chunk_size=config.chunk_size,
-        hidden_dims=config.hidden_dims,
-    )
-    policy = Policy(model, normalizer, config.policy_type, config.hidden_dims)
     optimizer = torch.optim.Adam(model.parameters(), lr=config.lr)
     compute_loss = torch.compile(model.compute_loss)
 
