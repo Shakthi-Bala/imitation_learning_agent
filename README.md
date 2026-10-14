@@ -12,11 +12,11 @@ The policy sees a 5-number state (pusher position, block position and angle) and
 | Part | What | Folder |
 |---|---|---|
 | 1 | MSE and flow matching policies on 2D Push-T (UC Berkeley [CS 185/285](https://rail.eecs.berkeley.edu/deeprlcourse/) Homework 1, Spring 2026) | [`pusht_action_chunking/`](pusht_action_chunking/) |
-| 2 | The same task with a UR5e arm in MuJoCo: zero-shot transfer and self-improvement | [`ur_pusht/`](ur_pusht/) |
+| 2 | The same task with a UR5e arm in MuJoCo: zero-shot transfer, self-improvement and RL fine-tuning | [`ur_pusht/`](ur_pusht/) |
 
 ## Part 1: 2D Push-T
 
-I trained two policies with the same network and training budget:
+Two policies share the same network and training budget:
 
 - **MSE:** predicts the 8 actions directly in one pass.
 - **Flow matching:** starts from random noise and refines it into an action chunk over 10 small steps, like a simpler form of diffusion.
@@ -43,7 +43,7 @@ MSE levels off around 0.63. When the demonstrations show two different ways to p
 
 Reports: [MSE (PDF)](pusht_action_chunking/report/mse_report.pdf) · [Flow matching (PDF)](pusht_action_chunking/report/flow_report.pdf) · [rollout videos](pusht_action_chunking/report/videos/)
 
-**How it works**
+### Method
 
 - **Model:** an MLP with 3 hidden layers of 256 units and ReLU, about 140k parameters, for both policies.
 - **MSE loss:** squared error between the predicted chunk and the human's chunk.
@@ -51,9 +51,9 @@ Reports: [MSE (PDF)](pusht_action_chunking/report/mse_report.pdf) · [Flow match
 - **Training:** Adam (learning rate 3e-4), batch size 128, 400 epochs, `torch.compile` for speed.
 - **Evaluation:** every 10k steps the policy plays 100 episodes in the simulator, running each 8-action chunk open-loop before re-planning.
 
-My code is in [`model.py`](pusht_action_chunking/src/hw1_imitation/model.py) (`MSEPolicy`, `FlowMatchingPolicy`), [`train.py`](pusht_action_chunking/src/hw1_imitation/train.py) (training loop) and [`plot_curves.py`](pusht_action_chunking/plot_curves.py). The data loading, environment and evaluation code is the course's starter code.
+Implemented in [`model.py`](pusht_action_chunking/src/hw1_imitation/model.py) (`MSEPolicy`, `FlowMatchingPolicy`), [`train.py`](pusht_action_chunking/src/hw1_imitation/train.py) (training loop) and [`plot_curves.py`](pusht_action_chunking/plot_curves.py). The data loading, environment and evaluation code is the course's starter code.
 
-## Push-T on a UR5e arm
+## Part 2: Push-T on a UR5e arm
 
 The same task with a UR5e holding a stick, in MuJoCo. The T now drags on the table with real friction (μ = 0.35), which the 2D benchmark does not have. Everything else matches the 2D task (1 px = 1 mm, same start states, same success test), so the 2D policies run on the arm unchanged.
 
@@ -68,7 +68,7 @@ The same task with a UR5e holding a stick, in MuJoCo. The T now drags on the tab
 
 The range is four evaluations of the same policy; tiny numerical differences between CPU types change contact-rich rollouts, so differences of about ±0.02 reward are noise.
 
-**Retraining on the robot's own successes did not help.** Each round ran the policy on 2000 new start states, kept the solved episodes, and trained on them. I tried three variants against a control trained on the human demos alone:
+**Retraining on the robot's own successes did not help.** Each round ran the policy on 2000 new start states, kept the solved episodes, and trained on them. Three variants were compared against a control trained on the human demos alone:
 
 <p align="center">
   <img src="ur_pusht/media/self_improvement.png" width="800" alt="Success rate and mean reward per self-improvement round for three variants, with the human-only control as a gray band">
@@ -87,7 +87,7 @@ Retraining from scratch (A, B) lost 0.04–0.12 reward against the control, beca
 | 2D flow policy, zero-shot | 0.797 | 14.8 % | 11.4 % |
 | After PPO fine-tuning | **0.854** | 16.0 % | **6.4 %** |
 
-Compared seed by seed, mean reward rose by 0.056 (95 % CI 0.032 to 0.082) and clear failures fell by 5.0 points (2.4 to 7.6), rescuing 26 starts the 2D policy failed outright while losing 8. The solve rate did not change measurably: RL mostly fixes failures rather than perfecting near-misses. The key setting was PPO's clip range: with the small per-step noise, the clip of 0.01 I started with blocked 40–60 % of updates and the policy never moved, while 0.1 let it learn. Advantage-weighted regression made the policy worse.
+Compared seed by seed, mean reward rose by 0.056 (95 % CI 0.032 to 0.082) and clear failures fell by 5.0 points (2.4 to 7.6), rescuing 26 starts the 2D policy failed outright while losing 8. The solve rate did not change measurably: RL mostly fixes failures rather than perfecting near-misses. The key setting was PPO's clip range: with the small per-step noise, a clip of 0.01 blocked 40–60 % of updates and the policy never moved, while 0.1 let it learn. Advantage-weighted regression made the policy worse.
 
 <p align="center">
   <img src="ur_pusht/media/rl_finetuning.png" width="900" alt="Left: mean reward during RL training for four runs. Right: change in mean reward and clear failures versus the 2D policy on 500 seeds, with 95% intervals that exclude zero">
@@ -95,7 +95,7 @@ Compared seed by seed, mean reward rose by 0.056 (95 % CI 0.032 to 0.082) and cl
 
 Report: [UR5e Push-T (PDF)](ur_pusht/report/ur_pusht_report.pdf) · videos: [solved](ur_pusht/media/pusht2d_flow_seed36.mp4), [failed](ur_pusht/media/pusht2d_flow_seed12.mp4), [before vs. after RL](ur_pusht/media/zero_shot_vs_ppo_seed105.mp4) · code and setup: [`ur_pusht/`](ur_pusht/)
 
-## Reproduce it
+## Reproducing the results
 
 You need Linux or macOS and [uv](https://docs.astral.sh/uv/). The dataset (31 MB) downloads automatically on the first run.
 
@@ -110,7 +110,7 @@ uv run src/hw1_imitation/train.py --policy-type mse
 uv run src/hw1_imitation/train.py --policy-type flow
 ```
 
-No W&B account? Prefix the training command with `WANDB_MODE=offline` and everything is still saved locally.
+Without a W&B account, prefix the training command with `WANDB_MODE=offline`; all outputs are still saved locally.
 
 Each run writes to `pusht_action_chunking/exp/<run_name>/`. To plot its curves:
 
@@ -121,11 +121,3 @@ uv run --with matplotlib plot_curves.py exp/<run_name> --title "Flow matching po
 All defaults (seed 42) match the results above. Flow matching samples random noise, so its exact reward varies slightly from run to run. Run `uv run src/hw1_imitation/train.py --help` to see every option.
 
 For the UR5e part, see [`ur_pusht/README.md`](ur_pusht/README.md).
-
-## Status
-
-- [x] MSE action-chunking policy
-- [x] Flow matching policy
-- [x] UR5e Push-T in MuJoCo: zero-shot transfer and self-improvement
-- [x] RL fine-tuning of the flow policy on the arm (PPO)
-- [ ] Raise the solve rate, not just the mean reward (e.g. a reward that favours the last 5 % of coverage)

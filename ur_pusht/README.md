@@ -2,7 +2,7 @@
 
 Push-T with a UR5e arm and a stick end effector in MuJoCo. The task, seeds and success test match
 the 2D benchmark in [`../pusht_action_chunking`](../pusht_action_chunking), so 2D policies run on the
-arm unchanged. `checkpoints/ur5e_flow_ppo.pt` is the PPO fine-tuned policy. Results are in the [repository README](../README.md#push-t-on-a-ur5e-arm) and the
+arm unchanged. `checkpoints/ur5e_flow_ppo.pt` is the PPO fine-tuned policy. Results are in the [repository README](../README.md#part-2-push-t-on-a-ur5e-arm) and the
 [report](report/ur_pusht_report.pdf).
 
 ## Setup

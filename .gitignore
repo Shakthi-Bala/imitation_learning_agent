@@ -5,3 +5,6 @@ wandb.txt
 .env.*
 .netrc
 secrets/
+
+# Private notes
+NOTES.md
