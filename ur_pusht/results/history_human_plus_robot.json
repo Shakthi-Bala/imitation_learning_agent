@@ -1,0 +1,76 @@
+[
+  {
+    "round": 0,
+    "policy": "checkpoints/pusht2d_flow.pt",
+    "eval": {
+      "mean_reward": 0.789454946195491,
+      "success_rate": 0.12,
+      "near_success_rate": 0.72,
+      "failure_rate": 0.11,
+      "mean_length": 284.57
+    }
+  },
+  {
+    "round": 1,
+    "policy": "runs/human_plus_robot/round1/policy.pt",
+    "collect": {
+      "mean_reward": 0.7810320321449317,
+      "success_rate": 0.144,
+      "near_success_rate": 0.7175,
+      "failure_rate": 0.1225,
+      "mean_length": 286.0195,
+      "episodes": 2000,
+      "kept_episodes": 288,
+      "kept_steps": 58439
+    },
+    "eval": {
+      "mean_reward": 0.6994517132205098,
+      "success_rate": 0.13,
+      "near_success_rate": 0.6,
+      "failure_rate": 0.17,
+      "mean_length": 287.94
+    }
+  },
+  {
+    "round": 2,
+    "policy": "runs/human_plus_robot/round2/policy.pt",
+    "collect": {
+      "mean_reward": 0.6873352805998065,
+      "success_rate": 0.0675,
+      "near_success_rate": 0.5705,
+      "failure_rate": 0.174,
+      "mean_length": 294.04,
+      "episodes": 2000,
+      "kept_episodes": 135,
+      "kept_steps": 28580
+    },
+    "eval": {
+      "mean_reward": 0.6167748736674329,
+      "success_rate": 0.05,
+      "near_success_rate": 0.41,
+      "failure_rate": 0.19,
+      "mean_length": 294.41
+    }
+  },
+  {
+    "round": 3,
+    "policy": "runs/human_plus_robot/round3/policy.pt",
+    "collect": {
+      "mean_reward": 0.6326321227922347,
+      "success_rate": 0.0465,
+      "near_success_rate": 0.47,
+      "failure_rate": 0.212,
+      "mean_length": 295.9275,
+      "episodes": 2000,
+      "kept_episodes": 93,
+      "kept_steps": 19755
+    },
+    "eval": {
+      "mean_reward": 0.6362304065027926,
+      "success_rate": 0.05,
+      "near_success_rate": 0.46,
+      "failure_rate": 0.22,
+      "mean_length": 294.34
+    }
+  }
+]

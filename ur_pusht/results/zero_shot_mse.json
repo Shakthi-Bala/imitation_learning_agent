@@ -1,0 +1,9 @@
+{
+  "mean_reward": 0.5240380420476065,
+  "success_rate": 0.07,
+  "near_success_rate": 0.43,
+  "failure_rate": 0.38,
+  "mean_length": 295.96,
+  "episodes": 100,
+  "policy": "checkpoints/pusht2d_mse.pt"
+}

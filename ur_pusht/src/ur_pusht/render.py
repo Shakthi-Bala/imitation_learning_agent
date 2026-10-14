@@ -28,7 +28,7 @@ class RenderConfig:
     height: int = 480
     width: int = 640
     frame_every: int = 5
-    gif_width: int = 600
+    gif_width: int = 800
     gif_stride: int = 3
 
 
