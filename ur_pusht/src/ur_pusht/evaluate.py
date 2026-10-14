@@ -24,8 +24,12 @@ def main(config: EvalConfig) -> dict[str, float]:
     summary = summarize(episodes) | {"episodes": config.episodes, "policy": str(config.policy)}
     print(json.dumps(summary, indent=2))
     if config.out is not None:
+        per_episode = [
+            {"seed": e.seed, "max_reward": e.max_reward, "success": e.success, "length": len(e)}
+            for e in episodes
+        ]
         config.out.parent.mkdir(parents=True, exist_ok=True)
-        config.out.write_text(json.dumps(summary, indent=2))
+        config.out.write_text(json.dumps(summary | {"per_episode": per_episode}, indent=2))
     return summary
 
 
