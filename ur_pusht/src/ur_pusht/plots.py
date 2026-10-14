@@ -1,4 +1,4 @@
-"""Figures for self-improvement runs: per-round evaluation and per-round training curves."""
+"""Figures: self-improvement rounds, their training curves, and RL fine-tuning curves."""
 
 from __future__ import annotations
 
@@ -117,12 +117,63 @@ def plot_training(run: Path, label: str, out: Path) -> Path:
     return path
 
 
-def main(config: PlotConfig) -> None:
+@dataclass
+class RLPlotConfig:
+    runs: tuple[Path, ...]
+    labels: tuple[str, ...]
+    offsets: tuple[int, ...] = ()
+    out: Path = Path("media")
+
+
+def plot_rl(config: RLPlotConfig) -> Path:
+    fig, (ax_reward, ax_success) = plt.subplots(1, 2, figsize=(10, 4.6), facecolor=SURFACE)
+    offsets = config.offsets or (0,) * len(config.runs)
+    starts = []
+    for run, label, offset, color in zip(config.runs, config.labels, offsets, COLORS):
+        rows = [json.loads(line) for line in (run / "metrics.jsonl").read_text().splitlines()]
+        evals = [r for r in rows if "eval/mean_reward" in r]
+        if offset == 0:
+            starts.append(evals[0])
+        x = [offset + r["iteration"] for r in evals]
+        for ax, key, scale in ((ax_reward, "mean_reward", 1), (ax_success, "success_rate", 100)):
+            y = [scale * r[f"eval/{key}"] for r in evals]
+            ax.plot(x, y, color=color, linewidth=2, marker="o", markersize=6, label=label)
+
+    for ax, key, scale in ((ax_reward, "mean_reward", 1), (ax_success, "success_rate", 100)):
+        values = [scale * s[f"eval/{key}"] for s in starts]
+        ax.axhspan(
+            min(values),
+            max(values),
+            color=GRID,
+            alpha=0.8,
+            zorder=0,
+            label="starting policy, repeated evaluations",
+        )
+        _style(ax)
+        ax.set_xlabel("RL iteration (256 episodes each)", color=INK_SECONDARY)
+    ax_reward.set_title("Mean reward (100 evaluation seeds)", loc="left", color=INK)
+    ax_success.set_title("Episodes solved (coverage > 95%)", loc="left", color=INK)
+    ax_success.set_ylabel("% of 100 evaluation seeds", color=INK_SECONDARY)
+    handles, labels = ax_reward.get_legend_handles_labels()
+    fig.legend(handles, labels, loc="lower center", ncol=2, frameon=False)
+    fig.tight_layout(rect=(0, 0.16, 1, 1))
+    path = config.out / "rl_finetuning.png"
+    fig.savefig(path, dpi=200, facecolor=SURFACE)
+    return path
+
+
+def rounds(config: PlotConfig) -> None:
     config.out.mkdir(parents=True, exist_ok=True)
     print(plot_rounds(config))
     for run, label in zip(config.runs, config.labels):
         print(plot_training(run, label, config.out))
 
 
+def rl(config: RLPlotConfig) -> None:
+    config.out.mkdir(parents=True, exist_ok=True)
+    print(plot_rl(config))
+
+
 if __name__ == "__main__":
-    main(tyro.cli(PlotConfig))
+    config = tyro.extras.subcommand_cli_from_dict({"rounds": PlotConfig, "rl": RLPlotConfig})
+    rl(config) if isinstance(config, RLPlotConfig) else rounds(config)

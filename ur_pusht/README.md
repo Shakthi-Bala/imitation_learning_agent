@@ -29,7 +29,7 @@ uv run python -m ur_pusht.improve --out runs/finetune --finetune --lr 1e-4 --tra
 uv run python -m ur_pusht.train --datasets ../pusht_action_chunking/data/pusht/pusht_cchi_v7_replay.zarr --out runs/human_only
 
 # Figures and videos
-uv run python -m ur_pusht.plots --runs runs/finetune --labels "fine-tuned" --out media
+uv run python -m ur_pusht.plots rounds --runs runs/finetune --labels "fine-tuned" --out media
 uv run python -m ur_pusht.render --policy checkpoints/pusht2d_flow.pt --seeds 7 --out media
 ```
 
