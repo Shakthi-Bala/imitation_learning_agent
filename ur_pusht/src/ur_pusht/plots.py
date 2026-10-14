@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import matplotlib.pyplot as plt
+import numpy as np
 import tyro
 
 COLORS = ("#2a78d6", "#eb6834", "#1baf7a", "#eda100")
@@ -18,8 +19,8 @@ class PlotConfig:
     runs: tuple[Path, ...]
     labels: tuple[str, ...]
     out: Path = Path("media")
-    reference_reward: float | None = None
-    reference_label: str = "2D policy in 2D sim"
+    baselines: tuple[Path, ...] = ()
+    baseline_label: str = "trained on human demos only"
 
 
 def _style(ax: plt.Axes) -> None:
@@ -30,13 +31,24 @@ def _style(ax: plt.Axes) -> None:
     ax.tick_params(colors=INK_SECONDARY)
 
 
+def _final_eval(run: Path) -> dict[str, float]:
+    rows = [json.loads(line) for line in (run / "metrics.jsonl").read_text().splitlines()]
+    last = [r for r in rows if "eval/mean_reward" in r][-1]
+    return {k.removeprefix("eval/"): v for k, v in last.items() if k.startswith("eval/")}
+
+
 def plot_rounds(config: PlotConfig) -> Path:
-    fig, (ax_success, ax_reward) = plt.subplots(1, 2, figsize=(10, 4), facecolor=SURFACE)
+    fig, (ax_success, ax_reward) = plt.subplots(1, 2, figsize=(10, 4.6), facecolor=SURFACE)
     for run, label, color in zip(config.runs, config.labels, COLORS):
         history = json.loads((run / "history.json").read_text())
         rounds = [h["round"] for h in history]
         success = [100 * h["eval"]["success_rate"] for h in history]
         reward = [h["eval"]["mean_reward"] for h in history]
+        episodes = history[0].get("episodes", 100)
+        ci = [196 * np.sqrt(s / 100 * (1 - s / 100) / episodes) for s in success]
+        ax_success.errorbar(
+            rounds, success, yerr=ci, fmt="none", ecolor=color, alpha=0.35, capsize=4
+        )
         for ax, values, fmt in ((ax_success, success, "{:.0f}%"), (ax_reward, reward, "{:.2f}")):
             ax.plot(rounds, values, color=color, linewidth=2, marker="o", markersize=7, label=label)
             ax.annotate(
@@ -48,21 +60,24 @@ def plot_rounds(config: PlotConfig) -> Path:
                 color=INK,
             )
 
-    if config.reference_reward is not None:
-        ax_reward.axhline(config.reference_reward, color=INK_SECONDARY, linewidth=1, linestyle="--")
-        ax_reward.text(
-            0.05, config.reference_reward + 0.01, config.reference_label, color=INK_SECONDARY
-        )
+    if config.baselines:
+        finals = [_final_eval(run) for run in config.baselines]
+        label = f"{config.baseline_label} ({len(finals)} seeds)"
+        for ax, key, scale in ((ax_success, "success_rate", 100), (ax_reward, "mean_reward", 1)):
+            values = [scale * f[key] for f in finals]
+            ax.axhspan(min(values), max(values), color=GRID, alpha=0.8, zorder=0, label=label)
     ax_success.set_title("Episodes solved (coverage > 95%)", loc="left", color=INK)
     ax_reward.set_title("Mean reward", loc="left", color=INK)
     ax_success.set_ylabel("% of 100 evaluation seeds", color=INK_SECONDARY)
+    ax_success.set_ylim(0, 35)
     ax_reward.set_ylim(0, 1)
     for ax in (ax_success, ax_reward):
         ax.set_xlabel("Self-improvement round (0 = zero-shot 2D policy)", color=INK_SECONDARY)
         ax.set_xticks(range(len(rounds)))
         _style(ax)
-    ax_success.legend(frameon=False, loc="upper left")
-    fig.tight_layout()
+    handles, labels = ax_success.get_legend_handles_labels()
+    fig.legend(handles, labels, loc="lower center", ncol=2, frameon=False)
+    fig.tight_layout(rect=(0, 0.14, 1, 1))
     path = config.out / "self_improvement.png"
     fig.savefig(path, dpi=200, facecolor=SURFACE)
     return path
