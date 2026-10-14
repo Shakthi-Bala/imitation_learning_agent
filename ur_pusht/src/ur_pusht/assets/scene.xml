@@ -59,7 +59,7 @@
       <geom class="visual_only" type="cylinder" size="0.007 0.0006" pos="0 0 0.0015" rgba="0.90 0.15 0.15 0.9"/>
     </body>
 
-    <camera name="front" pos="1.55 -1.15 1.15" mode="targetbody" target="workspace" fovy="40"/>
+    <camera name="front" pos="1.32 -0.95 1.08" mode="targetbody" target="workspace" fovy="42"/>
     <camera name="side" pos="0.40 -1.60 0.75" mode="targetbody" target="workspace" fovy="38"/>
     <camera name="top" pos="0.45 0 3.0" xyaxes="1 0 0 0 1 0" fovy="10.5"/>
   </worldbody>
