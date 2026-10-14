@@ -74,9 +74,26 @@ The range is four evaluations of the same policy; tiny numerical differences bet
   <img src="ur_pusht/media/self_improvement.png" width="800" alt="Success rate and mean reward per self-improvement round for three variants, with the human-only control as a gray band">
 </p>
 
-Retraining from scratch (A, B) lost 0.04–0.12 reward against the control, because the kept episodes come from start states the policy already solves, so each round's data gets narrower. Fine-tuning the previous policy (C) held roughly level. Keeping or dropping whole episodes tells the model nothing about which pushes mattered; using the reward inside training (RL fine-tuning of the flow policy) is the natural next step.
+Retraining from scratch (A, B) lost 0.04–0.12 reward against the control, because the kept episodes come from start states the policy already solves, so each round's data gets narrower. Fine-tuning the previous policy (C) held roughly level. Keeping or dropping whole episodes tells the model nothing about which pushes mattered. RL fine-tuning uses the reward inside training instead:
 
-Report: [UR5e Push-T (PDF)](ur_pusht/report/ur_pusht_report.pdf) · videos: [solved](ur_pusht/media/pusht2d_flow_seed36.mp4), [failed](ur_pusht/media/pusht2d_flow_seed12.mp4) · code and setup: [`ur_pusht/`](ur_pusht/)
+**RL fine-tuning with PPO does improve it.** The flow policy builds each action chunk in 10 denoising steps. Adding a little noise to each step turns them into a stochastic policy, so PPO can make chunks that did better than a learned critic expected more likely (as in [DPPO](https://diffusion-ppo.github.io/)). After about 10,000 practice episodes on the arm:
+
+<p align="center">
+  <img src="ur_pusht/media/zero_shot_vs_ppo_seed105.gif" width="720" alt="Same start state: the 2D policy pushes the T away from the goal; after PPO fine-tuning the arm pushes it onto the goal">
+</p>
+
+| Same 500 start states | Mean reward | Solved | Clear failures (reward < 0.3) |
+|---|---|---|---|
+| 2D flow policy, zero-shot | 0.797 | 14.8 % | 11.4 % |
+| After PPO fine-tuning | **0.854** | 16.0 % | **6.4 %** |
+
+Compared seed by seed, mean reward rose by 0.056 (95 % CI 0.032 to 0.082) and clear failures fell by 5.0 points (2.4 to 7.6), rescuing 26 starts the 2D policy failed outright while losing 8. The solve rate did not change measurably: RL mostly fixes failures rather than perfecting near-misses. The key setting was PPO's clip range: with the small per-step noise, the clip of 0.01 I started with blocked 40–60 % of updates and the policy never moved, while 0.1 let it learn. Advantage-weighted regression made the policy worse.
+
+<p align="center">
+  <img src="ur_pusht/media/rl_finetuning.png" width="900" alt="Left: mean reward during RL training for four runs. Right: change in mean reward and clear failures versus the 2D policy on 500 seeds, with 95% intervals that exclude zero">
+</p>
+
+Report: [UR5e Push-T (PDF)](ur_pusht/report/ur_pusht_report.pdf) · videos: [solved](ur_pusht/media/pusht2d_flow_seed36.mp4), [failed](ur_pusht/media/pusht2d_flow_seed12.mp4), [before vs. after RL](ur_pusht/media/zero_shot_vs_ppo_seed105.mp4) · code and setup: [`ur_pusht/`](ur_pusht/)
 
 ## Reproduce it
 
@@ -110,4 +127,5 @@ For the UR5e part, see [`ur_pusht/README.md`](ur_pusht/README.md).
 - [x] MSE action-chunking policy
 - [x] Flow matching policy
 - [x] UR5e Push-T in MuJoCo: zero-shot transfer and self-improvement
-- [ ] RL fine-tuning of the flow policy on the arm
+- [x] RL fine-tuning of the flow policy on the arm (PPO)
+- [ ] Raise the solve rate, not just the mean reward (e.g. a reward that favours the last 5 % of coverage)

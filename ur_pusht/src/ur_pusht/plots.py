@@ -121,42 +121,92 @@ def plot_training(run: Path, label: str, out: Path) -> Path:
 class RLPlotConfig:
     runs: tuple[Path, ...]
     labels: tuple[str, ...]
-    offsets: tuple[int, ...] = ()
+    start_eval: Path
+    final_evals: tuple[Path, ...]
+    final_labels: tuple[str, ...]
     out: Path = Path("media")
+    bootstrap: int = 5000
+
+
+def _paired_change(start: Path, final: Path, metric, samples: int) -> tuple[float, float, float]:
+    """Mean per-seed change from the start policy, with a 95% bootstrap interval."""
+    before = {e["seed"]: e for e in json.loads(start.read_text())["per_episode"]}
+    after = {e["seed"]: e for e in json.loads(final.read_text())["per_episode"]}
+    change = np.array([metric(after[s]) - metric(before[s]) for s in sorted(before)])
+    rng = np.random.default_rng(0)
+    means = [change[rng.integers(0, len(change), len(change))].mean() for _ in range(samples)]
+    low, high = np.percentile(means, [2.5, 97.5])
+    return change.mean(), low, high
 
 
 def plot_rl(config: RLPlotConfig) -> Path:
-    fig, (ax_reward, ax_success) = plt.subplots(1, 2, figsize=(10, 4.6), facecolor=SURFACE)
-    offsets = config.offsets or (0,) * len(config.runs)
+    fig, axes = plt.subplots(
+        1, 3, figsize=(13, 4.4), facecolor=SURFACE, gridspec_kw={"width_ratios": [1.6, 1, 1]}
+    )
+    ax_curve, ax_reward, ax_failure = axes
     starts = []
-    for run, label, offset, color in zip(config.runs, config.labels, offsets, COLORS):
+    for run, label, color in zip(config.runs, config.labels, COLORS):
         rows = [json.loads(line) for line in (run / "metrics.jsonl").read_text().splitlines()]
         evals = [r for r in rows if "eval/mean_reward" in r]
-        if offset == 0:
-            starts.append(evals[0])
-        x = [offset + r["iteration"] for r in evals]
-        for ax, key, scale in ((ax_reward, "mean_reward", 1), (ax_success, "success_rate", 100)):
-            y = [scale * r[f"eval/{key}"] for r in evals]
-            ax.plot(x, y, color=color, linewidth=2, marker="o", markersize=6, label=label)
-
-    for ax, key, scale in ((ax_reward, "mean_reward", 1), (ax_success, "success_rate", 100)):
-        values = [scale * s[f"eval/{key}"] for s in starts]
-        ax.axhspan(
-            min(values),
-            max(values),
-            color=GRID,
-            alpha=0.8,
-            zorder=0,
-            label="starting policy, repeated evaluations",
+        starts.append(evals[0]["eval/mean_reward"])
+        ax_curve.plot(
+            [r["iteration"] for r in evals],
+            [r["eval/mean_reward"] for r in evals],
+            color=color,
+            linewidth=2,
+            marker="o",
+            markersize=5,
+            label=label,
         )
+    ax_curve.axhspan(min(starts), max(starts), color=GRID, alpha=0.8, zorder=0)
+    ax_curve.set_title("Mean reward during training (100 seeds)", loc="left", color=INK)
+    ax_curve.set_xlabel("RL iteration (256 episodes each)", color=INK_SECONDARY)
+
+    metrics = (
+        (ax_reward, lambda e: e["max_reward"], 1, "{:+.3f}", "Change in mean reward"),
+        (
+            ax_failure,
+            lambda e: float(e["max_reward"] < 0.3),
+            100,
+            "{:+.1f}",
+            "Change in clear failures (pts)",
+        ),
+    )
+    rows = range(len(config.final_evals))
+    for ax, metric, scale, fmt, title in metrics:
+        for row, path in zip(rows, config.final_evals):
+            mean, low, high = (
+                scale * v for v in _paired_change(config.start_eval, path, metric, config.bootstrap)
+            )
+            ax.errorbar(
+                mean,
+                row,
+                xerr=[[mean - low], [high - mean]],
+                fmt="o",
+                color=INK,
+                ecolor=INK_SECONDARY,
+                capsize=4,
+                markersize=7,
+            )
+            ax.annotate(
+                fmt.format(mean),
+                (mean, row),
+                textcoords="offset points",
+                xytext=(0, 9),
+                ha="center",
+                color=INK,
+            )
+        ax.axvline(0, color=INK_SECONDARY, linewidth=1)
+        ax.set_yticks(list(rows), config.final_labels if ax is ax_reward else [])
+        ax.set_ylim(len(config.final_evals) - 0.5, -0.6)
+        ax.set_title(title, loc="left", color=INK)
+        ax.set_xlabel("vs. 2D policy, same 500 seeds (95% CI)", color=INK_SECONDARY)
+
+    for ax in axes:
         _style(ax)
-        ax.set_xlabel("RL iteration (256 episodes each)", color=INK_SECONDARY)
-    ax_reward.set_title("Mean reward (100 evaluation seeds)", loc="left", color=INK)
-    ax_success.set_title("Episodes solved (coverage > 95%)", loc="left", color=INK)
-    ax_success.set_ylabel("% of 100 evaluation seeds", color=INK_SECONDARY)
-    handles, labels = ax_reward.get_legend_handles_labels()
-    fig.legend(handles, labels, loc="lower center", ncol=2, frameon=False)
-    fig.tight_layout(rect=(0, 0.16, 1, 1))
+    handles, labels = ax_curve.get_legend_handles_labels()
+    fig.legend(handles, labels, loc="lower left", ncol=2, frameon=False, bbox_to_anchor=(0.02, 0))
+    fig.tight_layout(rect=(0, 0.14, 1, 1))
     path = config.out / "rl_finetuning.png"
     fig.savefig(path, dpi=200, facecolor=SURFACE)
     return path

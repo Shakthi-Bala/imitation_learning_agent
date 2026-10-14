@@ -2,7 +2,7 @@
 
 Push-T with a UR5e arm and a stick end effector in MuJoCo. The task, seeds and success test match
 the 2D benchmark in [`../pusht_action_chunking`](../pusht_action_chunking), so 2D policies run on the
-arm unchanged. Results are in the [repository README](../README.md#push-t-on-a-ur5e-arm) and the
+arm unchanged. `checkpoints/ur5e_flow_ppo.pt` is the PPO fine-tuned policy. Results are in the [repository README](../README.md#push-t-on-a-ur5e-arm) and the
 [report](report/ur_pusht_report.pdf).
 
 ## Setup
@@ -25,12 +25,16 @@ uv run python -m ur_pusht.evaluate --policy checkpoints/pusht2d_flow.pt --worker
 # Self-improvement: collect successes, retrain, repeat
 uv run python -m ur_pusht.improve --out runs/finetune --finetune --lr 1e-4 --train-steps 20000
 
+# RL fine-tuning of the flow policy (PPO over the denoising steps; --algo awr also available)
+uv run python -m ur_pusht.rl --algo ppo --sigma 0.1 --clip 0.1 --actor-lr 3e-5 --minibatch 512 --iterations 40 --out runs/rl_ppo
+
 # Train on any mix of datasets (robot episodes or the 2D human demos)
 uv run python -m ur_pusht.train --datasets ../pusht_action_chunking/data/pusht/pusht_cchi_v7_replay.zarr --out runs/human_only
 
 # Figures and videos
 uv run python -m ur_pusht.plots rounds --runs runs/finetune --labels "fine-tuned" --out media
-uv run python -m ur_pusht.render --policy checkpoints/pusht2d_flow.pt --seeds 7 --out media
+uv run python -m ur_pusht.render episode --policy checkpoints/pusht2d_flow.pt --seeds 7 --out media
+uv run python -m ur_pusht.render compare --policies checkpoints/pusht2d_flow.pt checkpoints/ur5e_flow_ppo.pt --labels "zero-shot" "PPO" --seed 105
 ```
 
 Every command takes `--help`. Collection and evaluation run episodes in parallel; set `--workers`
@@ -56,4 +60,5 @@ OSMESA_PREFIX=~/envs/osmesa scripts/headless.sh uv run python -m ur_pusht.render
 | `policy.py` | model + normalizer bundles, import of 2D checkpoints |
 | `rollout.py` | parallel episodes with open-loop action chunks |
 | `collect.py`, `train.py`, `improve.py` | data collection, training, self-improvement rounds |
+| `rl.py` | RL fine-tuning: PPO over the denoising steps, and AWR |
 | `evaluate.py`, `plots.py`, `render.py` | evaluation, figures, videos |
