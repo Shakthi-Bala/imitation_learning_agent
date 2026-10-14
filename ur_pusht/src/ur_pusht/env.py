@@ -8,6 +8,7 @@ and the arm tracks the reference with differential inverse kinematics at a fixed
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -150,6 +151,10 @@ class URPushTEnv:
         self._ready_q = self._ik.solve(READY_SEED, self._tip_world(geo.GOAL_POSE[:2]), 100, 0.05)
         self._renderer: mujoco.Renderer | None = None
 
+    @property
+    def substep_hz(self) -> float:
+        return self.config.control_hz * self._substeps
+
     def _tip_world(self, xy_px: np.ndarray) -> np.ndarray:
         return np.append(geo.px_to_world(xy_px), self.config.tip_height)
 
@@ -200,7 +205,7 @@ class URPushTEnv:
         self.steps = 0
         return self.observation()
 
-    def step(self, action: np.ndarray):
+    def step(self, action: np.ndarray, on_substep: Callable[[], None] | None = None):
         config = self.config
         target = np.clip(action, 0.0, geo.WORKSPACE_PX)
         self.data.mocap_pos[self._target_mocap, :2] = geo.px_to_world(target)
@@ -217,6 +222,8 @@ class URPushTEnv:
             joint_velocity = (self._q_target - q_previous) / config.reference_dt
             self.data.ctrl[:] = self._q_target + self._servo_lag * joint_velocity
             mujoco.mj_step(self.model, self.data, nstep=self._physics_steps)
+            if on_substep is not None:
+                on_substep()
 
         self.steps += 1
         block_pose = self._block_pose()

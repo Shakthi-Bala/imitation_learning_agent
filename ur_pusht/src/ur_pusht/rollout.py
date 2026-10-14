@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import multiprocessing as mp
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -30,7 +31,11 @@ class Episode:
 
 
 def run_episode(
-    env: URPushTEnv, policy: Policy, seed: int, sample_seed: int | None = None, on_step=None
+    env: URPushTEnv,
+    policy: Policy,
+    seed: int,
+    sample_seed: int | None = None,
+    on_substep: Callable[[], None] | None = None,
 ) -> Episode:
     torch.manual_seed(seed if sample_seed is None else sample_seed)
     observation = env.reset(seed)
@@ -43,11 +48,9 @@ def run_episode(
         index += 1
         states.append(observation)
         actions.append(action)
-        observation, reward, success, truncated, _ = env.step(action)
+        observation, reward, success, truncated, _ = env.step(action, on_substep)
         rewards.append(reward)
         done = success or truncated
-        if on_step is not None:
-            on_step(env)
     return Episode(seed, np.array(states), np.array(actions), np.array(rewards), bool(success))
 
 
