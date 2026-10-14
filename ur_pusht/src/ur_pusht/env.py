@@ -32,8 +32,8 @@ ARM_JOINTS = (
 READY_SEED = np.array([np.pi, -np.pi / 2, np.pi / 2, -np.pi / 2, -np.pi / 2, 0.0])
 
 TIP_RADIUS = 0.015
-ARM_MESH_GROUP = 2
 TIP_OFFSET = 0.18
+ARM_MESH_GROUP = 2
 
 
 @dataclass(frozen=True)
@@ -49,6 +49,7 @@ class EnvConfig:
 
 
 def _add_stick(arm: mujoco.MjSpec) -> None:
+    # Collision bit 2 is shared only with the T block, so the stick can never touch the table.
     site = arm.site("attachment_site")
     stick = arm.body("wrist_3_link").add_body(name="stick", pos=site.pos, quat=site.quat)
     stick.add_geom(
@@ -145,6 +146,8 @@ class URPushTEnv:
         tip_down = self.data.site_xmat[self._tip].reshape(3, 3).copy()
         self._ik = DifferentialIK(self.model, joint_ids, self._tip, tip_down)
 
+        # The UR5e position servos lag a moving target by (kv / kp) * joint velocity;
+        # adding that term to the command cancels the lag.
         self._servo_lag = -self.model.actuator_biasprm[:, 2] / self.model.actuator_gainprm[:, 0]
         self._substeps = round(1.0 / (config.control_hz * config.reference_dt))
         self._physics_steps = round(config.reference_dt / self.model.opt.timestep)
