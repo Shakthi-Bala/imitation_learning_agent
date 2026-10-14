@@ -1,0 +1,38 @@
+[project]
+name = "ur-pusht"
+version = "0.1.0"
+description = "Push-T with a UR5e arm in MuJoCo: action-chunking policies trained by self-improvement"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "hw1-imitation",
+    "imageio>=2.37.2",
+    "imageio-ffmpeg>=0.6.0",
+    "matplotlib>=3.9",
+    "mujoco>=3.3",
+    "numpy>=2.0",
+    "pillow>=11.0",
+    "shapely>=2.0",
+    "torch>=2.9.1",
+    "tyro>=1.0.3",
+    "zarr>=3.1.5",
+]
+
+[tool.uv.sources]
+hw1-imitation = { path = "../pusht_action_chunking", editable = true }
+
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+ur_pusht = ["assets/*.xml"]
+
+[tool.ruff]
+line-length = 100

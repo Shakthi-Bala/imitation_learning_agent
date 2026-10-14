@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+.venv/
+*.egg-info/
+.ruff_cache/
+
+# Fetched by scripts/fetch_ur5e.sh
+src/ur_pusht/assets/universal_robots_ur5e/
+
+# Generated
+data/
+runs/

@@ -1,0 +1,66 @@
+<mujoco model="ur5e_pusht">
+  <compiler angle="radian"/>
+  <option timestep="0.002" integrator="implicitfast" cone="elliptic" impratio="10"/>
+
+  <visual>
+    <headlight diffuse="0.15 0.15 0.15" ambient="0.15 0.15 0.15" specular="0 0 0"/>
+    <global offwidth="1280" offheight="960"/>
+    <quality shadowsize="4096"/>
+  </visual>
+
+  <asset>
+    <texture name="sky" type="skybox" builtin="gradient" rgb1="0.97 0.97 0.98" rgb2="0.80 0.83 0.88" width="512" height="512"/>
+    <texture name="floor" type="2d" builtin="checker" rgb1="0.86 0.87 0.89" rgb2="0.80 0.81 0.84" width="512" height="512"/>
+    <material name="floor" texture="floor" texrepeat="8 8" reflectance="0.05"/>
+    <material name="table" rgba="0.74 0.62 0.48 1" specular="0.2" shininess="0.3"/>
+    <material name="leg" rgba="0.30 0.30 0.32 1"/>
+    <material name="mat" rgba="0.90 0.90 0.89 1" specular="0"/>
+    <material name="tee" rgba="0.467 0.533 0.600 1" specular="0.1" shininess="0.2"/>
+    <material name="goal" rgba="0.36 0.78 0.42 1" specular="0"/>
+    <material name="rod" rgba="0.75 0.76 0.78 1" specular="0.8" shininess="0.8"/>
+    <material name="tip" rgba="0.255 0.412 0.882 1" specular="0.4"/>
+  </asset>
+
+  <default>
+    <default class="visual_only">
+      <geom contype="0" conaffinity="0" group="1"/>
+    </default>
+  </default>
+
+  <worldbody>
+    <light name="key" pos="0.9 -0.8 1.8" dir="-0.45 0.4 -1" directional="true" diffuse="0.45 0.45 0.45" castshadow="true"/>
+    <light name="fill" pos="-0.6 0.8 1.6" dir="0.5 -0.4 -1" directional="true" diffuse="0.2 0.2 0.22" castshadow="false"/>
+
+    <geom name="floor" type="plane" size="3 3 0.1" pos="0 0 -0.75" material="floor" contype="0" conaffinity="0"/>
+    <geom name="table" type="box" size="0.55 0.45 0.025" pos="0.30 0 -0.025" material="table" contype="1" conaffinity="1" friction="0.35 0.005 0.0001"/>
+    <geom class="visual_only" type="box" size="0.025 0.025 0.36" pos="-0.20 -0.40 -0.41" material="leg"/>
+    <geom class="visual_only" type="box" size="0.025 0.025 0.36" pos="-0.20 0.40 -0.41" material="leg"/>
+    <geom class="visual_only" type="box" size="0.025 0.025 0.36" pos="0.80 -0.40 -0.41" material="leg"/>
+    <geom class="visual_only" type="box" size="0.025 0.025 0.36" pos="0.80 0.40 -0.41" material="leg"/>
+
+    <body name="workspace" pos="0.45 0 0">
+      <geom class="visual_only" name="mat" type="box" size="0.256 0.256 0.0004" pos="0 0 0.0004" material="mat"/>
+    </body>
+
+    <body name="goal" pos="0.45 0 0" euler="0 0 0.785398">
+      <geom class="visual_only" type="box" size="0.060 0.015 0.0005" pos="0 0.015 0.0009" material="goal"/>
+      <geom class="visual_only" type="box" size="0.015 0.045 0.0005" pos="0 0.075 0.0009" material="goal"/>
+    </body>
+
+    <body name="tee" pos="0.45 0.1 0">
+      <freejoint name="tee"/>
+      <geom name="tee_bar" type="box" size="0.060 0.015 0.015" pos="0 0.015 0.015" material="tee"
+            density="1240" contype="3" conaffinity="3" friction="0.35 0.005 0.0001"/>
+      <geom name="tee_stem" type="box" size="0.015 0.045 0.015" pos="0 0.075 0.015" material="tee"
+            density="1240" contype="3" conaffinity="3" friction="0.35 0.005 0.0001"/>
+    </body>
+
+    <body name="target" mocap="true" pos="0.45 0 0">
+      <geom class="visual_only" type="cylinder" size="0.007 0.0006" pos="0 0 0.0015" rgba="0.90 0.15 0.15 0.9"/>
+    </body>
+
+    <camera name="front" pos="1.55 -1.15 1.15" mode="targetbody" target="workspace" fovy="40"/>
+    <camera name="side" pos="0.40 -1.60 0.75" mode="targetbody" target="workspace" fovy="38"/>
+    <camera name="top" pos="0.45 0 3.0" xyaxes="1 0 0 0 1 0" fovy="10.5"/>
+  </worldbody>
+</mujoco>
