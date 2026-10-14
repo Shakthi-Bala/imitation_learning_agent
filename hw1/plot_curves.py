@@ -29,6 +29,7 @@ def main() -> None:
     parser.add_argument("run_dir", type=Path)
     parser.add_argument("--out", type=Path, default=None)
     parser.add_argument("--title", default="MSE policy")
+    parser.add_argument("--target", type=float, default=0.5)
     args = parser.parse_args()
 
     rows = load_metrics(args.run_dir)
@@ -60,9 +61,9 @@ def main() -> None:
     steps = [r["step"] for r in evals]
     rewards = [r["eval/mean_reward"] for r in evals]
     ax_rew.plot(steps, rewards, color=SERIES, linewidth=2, marker="o", markersize=7)
-    ax_rew.axhline(0.5, color=INK_SECONDARY, linewidth=1, linestyle="--")
+    ax_rew.axhline(args.target, color=INK_SECONDARY, linewidth=1, linestyle="--")
     ax_rew.text(
-        steps[0] if steps else 0, 0.51, "target 0.5",
+        steps[0] if steps else 0, args.target + 0.01, f"target {args.target:g}",
         color=INK_SECONDARY, fontsize=9, va="bottom",
     )
     if steps:

@@ -90,7 +90,8 @@ class FlowMatchingPolicy(BasePolicy):
     ) -> None:
         super().__init__(state_dim, action_dim, chunk_size)
         #MLP
-        in_dim = state_dim + chunk_size*action_diim +1
+        layers: list[nn.Module] = []
+        in_dim = state_dim + chunk_size*action_dim +1
         for hidden_dim in  hidden_dims:
             layers += [nn.Linear(in_dim, hidden_dim), nn.ReLU()]
             in_dim = hidden_dim
@@ -104,7 +105,7 @@ class FlowMatchingPolicy(BasePolicy):
         tau: torch.Tensor,
     ) -> torch.Tensor:
 
-        x = torch.cat([state, A_tau.flatten(1)], dim = -1)
+        x = torch.cat([state, A_tau.flatten(1), tau], dim = -1)
         v = self.net(x)
         return v.view(-1, self.chunk_size, self.action_dim)
 
@@ -129,7 +130,6 @@ class FlowMatchingPolicy(BasePolicy):
         *,
         num_steps: int = 10,
     ) -> torch.Tensor:
-        raise NotImplementedError
         B = state.shape[0]
         A = torch.randn(B, self.chunk_size, self.action_dim, device = state.device)
         dt = 1.0 / num_steps
