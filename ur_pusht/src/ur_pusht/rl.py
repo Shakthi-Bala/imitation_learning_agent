@@ -43,6 +43,7 @@ class RLConfig:
     out: Path = Path("runs/rl")
     iterations: int = 30
     episodes_per_iter: int = 256
+    first_seed: int = RL_SEED_OFFSET
     workers: int = 32
     sigma: float = 0.05
     gamma: float = 0.99
@@ -277,7 +278,7 @@ def finetune(config: RLConfig) -> list[dict]:
     ) as pool:
         for iteration in range(1, config.iterations + 1):
             torch.save(policy.model.state_dict(), weights)
-            first = RL_SEED_OFFSET + (iteration - 1) * config.episodes_per_iter
+            first = config.first_seed + (iteration - 1) * config.episodes_per_iter
             jobs = [
                 (seed, weights, iteration, config.sigma, config.success_bonus)
                 for seed in range(first, first + config.episodes_per_iter)
